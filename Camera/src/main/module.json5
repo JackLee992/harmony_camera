@@ -1,0 +1,55 @@
+{
+  "module": {
+    "name": "Camera",
+    "type": "feature",
+    "description": "$string:module_desc",
+    "mainElement": "CameraAbility",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.CAMERA"
+      },
+      {
+        "name": "ohos.permission.MICROPHONE"
+      },
+      {
+        "name": "ohos.permission.MEDIA_LOCATION"
+      },
+      {
+        "name": "ohos.permission.WRITE_MEDIA"
+      },
+      {
+        "name": "ohos.permission.READ_MEDIA"
+      }
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "CameraAbility",
+        "srcEntry": "./ets/cameraability/CameraAbility.ets",
+        "description": "$string:CameraAbility_desc",
+        "icon": "$media:icon",
+        "label": "$string:CameraAbility_label",
+        "startWindowIcon": "$media:startIcon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "action.system.home"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

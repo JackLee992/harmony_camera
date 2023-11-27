@@ -1,0 +1,20 @@
+{
+  "types": "",
+  "keywords": [
+    "videocompressor",
+    "HarmonyOS"
+  ],
+  "author": "liyiln02@megvii.com",
+  "description": "",
+  "main": "index.ets",
+  "type": "module",
+  "version": "0.0.1",
+  "dependencies": {},
+  "tags": [
+    "Tool"
+  ],
+  "devDependencies": {
+    "@types/libvideoCompressor.so": "file:./src/main/cpp/types/libvideocompressor"
+  },
+  "name": "@ohos/videocompressor"
+}

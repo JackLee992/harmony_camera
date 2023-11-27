@@ -1,0 +1,66 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/jacklee/.ohos/config/auto_debug_faceid_camera_com.megvii.faceid_camera_30086000724899094.cer",
+          "storePassword": "0000001AA1D02A497099C9A2EA3851FB01E584E09C52D4352DD6DD1B6B8B709BF0E9167A7B58EBC72BAF",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A1654CE646847FF7840B042C6265F2D83EBD53EBA8D225F7C6865E278345B5F2F5F3588FEFECE",
+          "profile": "/Users/jacklee/.ohos/config/auto_debug_faceid_camera_com.megvii.faceid_camera_30086000724899094.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/jacklee/.ohos/config/auto_debug_faceid_camera_com.megvii.faceid_camera_30086000724899094.p12"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compileSdkVersion": "4.0.0(10)",
+        "compatibleSdkVersion": "4.0.0(10)",
+        "runtimeOS": "HarmonyOS",
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Camera",
+      "srcPath": "./Camera",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "videoCompressor",
+      "srcPath": "./videoCompressor"
+    }
+  ]
+}
