@@ -9,12 +9,12 @@
 
 #include "VideoRecordBean.h"
 class VideoRecordManager {
+    bool videoRecorderIsReady = false;
     int32_t CreateVideoEncode();
-    int32_t width;
-    int32_t height;
     int32_t CreateMutex();
     void VideoCompressorWaitEos();
-    int NativeRecordStart();
+    void NativeRecordStart();
+    void SetCallBackResult(int32_t code, std::string str);
     void Release();
 public:
     std::unique_ptr<VideoRecordBean> videoRecordBean_;
@@ -22,9 +22,10 @@ public:
         static VideoRecordManager instance;
         return instance;
     }
-    int startRecord();
+    void startRecord();
     void pushOneFrameData(void *data);
+    void DealCallback(void *data);
     void stopRecord();
 };
 
-#endif //ohos_videocompressor_VideoRecordHandler_H
+#endif // ohos_videocompressor_VideoRecordHandler_H

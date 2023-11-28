@@ -37,16 +37,16 @@ int32_t Muxer::CreateMuxer(int32_t fd)
         OH_LOG_ERROR(LOG_APP, "create muxer failed");
         return AV_ERR_UNKNOWN;
     }
-    OH_LOG_ERROR(LOG_APP, "muxer:audioMime:%{public}s--audioSampleRate:%{public}d"
-                 "--audioChannelCount:%{public}d--audioBitrate:%{public}d",
-                 audioMime.c_str(), audioSampleRate, audioChannelCount, audioBitrate);
-    OH_LOG_ERROR(LOG_APP, "muxer:videoMime:%{public}s--videoWidth:%{public}d"
-                 "--videoHeight:%{public}d", videoMime.c_str(), width, height);
-    OH_AVFormat *formatAudio = OH_AVFormat_CreateAudioFormat(audioMime.data(), audioSampleRate, audioChannelCount);
-    if (!formatAudio) {
-        OH_LOG_ERROR(LOG_APP, "muxer create audioFormat error");
-        return AV_ERR_UNKNOWN;
-    }
+//    OH_LOG_ERROR(LOG_APP, "muxer:audioMime:%{public}s--audioSampleRate:%{public}d"
+//                 "--audioChannelCount:%{public}d--audioBitrate:%{public}d",
+//                 audioMime.c_str(), audioSampleRate, audioChannelCount, audioBitrate); // TOOD：fixme 音频
+//    OH_LOG_ERROR(LOG_APP, "muxer:videoMime:%{public}s--videoWidth:%{public}d"
+//                 "--videoHeight:%{public}d", videoMime.c_str(), width, height);
+//    OH_AVFormat *formatAudio = OH_AVFormat_CreateAudioFormat(audioMime.data(), audioSampleRate, audioChannelCount);
+//    if (!formatAudio) {
+//        OH_LOG_ERROR(LOG_APP, "muxer create audioFormat error");
+//        return AV_ERR_UNKNOWN;
+//    }
     OH_AVFormat *formatVideo = OH_AVFormat_CreateVideoFormat(videoMime.data(), width, height);
     if (!formatVideo) {
         OH_LOG_ERROR(LOG_APP, "muxer create videoFormat error");
@@ -55,8 +55,8 @@ int32_t Muxer::CreateMuxer(int32_t fd)
     OH_AVFormat_SetDoubleValue(formatVideo, OH_MD_KEY_FRAME_RATE,
                                videoFrameRate > 0 ? videoFrameRate : defaultFrameDefault);
     OH_AVMuxer_AddTrack(muxer, &vTrackId, formatVideo);
-    OH_AVMuxer_AddTrack(muxer, &aTrackId, formatAudio);
-    OH_AVFormat_Destroy(formatAudio);
+//    OH_AVMuxer_AddTrack(muxer, &aTrackId, formatAudio);
+//    OH_AVFormat_Destroy(formatAudio);
     OH_AVFormat_Destroy(formatVideo);
     OH_AVMuxer_SetRotation(muxer, 0);
     int ret = OH_AVMuxer_Start(muxer);

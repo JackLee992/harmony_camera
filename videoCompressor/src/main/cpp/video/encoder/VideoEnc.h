@@ -45,9 +45,9 @@ class VideoEnc {
 public:
     VideoEnc() = default;
     ~VideoEnc();
-    uint32_t width = 1080; // TODO
-    uint32_t height = 1920; // TODO
-    uint32_t bitrate = 10000000;
+    uint32_t width = 1920; 
+    uint32_t height = 1080; 
+    uint32_t bitrate = 959000;
     double frameRate = 24;
     std::string videoMime = "";
 //    int32_t CreateVideoEncoder(std::string codeName);

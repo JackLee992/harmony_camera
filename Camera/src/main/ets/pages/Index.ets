@@ -7,6 +7,8 @@ import { GlobalContext } from '../utils/GlobalContext';
 import Logger from '../utils/Logger';
 import display from '@ohos.display';
 import { CompressorResponseCode, CompressQuality, VideoCompressor } from '@ohos/videoCompressor';
+import hilog from '@ohos.hilog';
+import data from '@ohos.telephony.data';
 
 let TAG: string = "Index";
 let cameraWidth = 1920;
@@ -24,11 +26,10 @@ struct Index {
   private surfaceId: string = "-1";
   private display = display.getDefaultDisplaySync();
   private heightPx = (this.display.width * cameraWidth / cameraHeight) + 'px';
-  private receiver:image.ImageReceiver = createImageReceiver();
+  private receiver: image.ImageReceiver = createImageReceiver();
 
-
-  async onPageShow(){
-    videoCompressor.startRecorder(getContext(),cameraWidth,cameraHeight)
+  async onPageShow() {
+    this.startRecord();
     await grantPermission().then(res => {
       console.info(TAG, `权限申请成功  ${JSON.stringify(res)}`);
       if (res) {
@@ -37,7 +38,20 @@ struct Index {
     })
   }
 
-  onPageHide(){
+  private startRecord() {
+    videoCompressor.startRecorder(getContext(), cameraWidth, cameraHeight)
+      .then((data) => {
+        if (data.code == CompressorResponseCode.SUCCESS) {
+          console.log("videoCompressor message:" + data.message + "--outputPath:" + data.outputPath);
+        } else {
+          console.log("videoCompressor code:" + data.code + "--error message:" + data.message);
+        }
+      }).catch((err: Error) => {
+      console.log("videoCompressor HIGH get error message" + err.message);
+    });
+  }
+
+  onPageHide() {
     videoCompressor.stopRecorder()
     releaseCamera()
   }
@@ -78,7 +92,7 @@ function createImageReceiver(): image.ImageReceiver {
           let buffer = imgComponent.byteBuffer;
           Logger.debug("receiveImage--byteBuffer -success:" + " buffer:" + buffer);
           // TODO  process ths image
-          videoCompressor.pushOneFrameData(buffer)
+          videoCompressor.pushOneFrameData(buffer) // TODO
           // let imageResource = image.createImageSource(buffer);
           // let pixMap:PixelMap = imageResource.createPixelMap();
           // pixMap.release()

@@ -34,9 +34,9 @@ public:
     uint32_t width;
     uint32_t height;
     double videoFrameRate;
-    int32_t audioBitrate;
-    int32_t audioSampleRate;
-    int audioChannelCount;
+//    int32_t audioBitrate;
+//    int32_t audioSampleRate;
+//    int audioChannelCount;
 private:
     double defaultFrameDefault = 60.0;
     bool audioIsEnd = false;

@@ -24,10 +24,13 @@ struct VideoRecordBean {
     napi_env env;
     int32_t width;
     int32_t height;
+    uint32_t bitrate;
+    double frameRate;
+    std::string videoMime;
     std::unique_ptr<Muxer> *muxer;
     std::unique_ptr<VideoEnc> *vEncSample;
-    AsyncCallbackInfo *asyncCallbackInfo;
     std::unique_ptr<MutexManager> *mutexManager;
+//    std::unique_ptr<AsyncCallbackInfo> *callbackInfo;
     std::string outputPath = "";
     int32_t outFd = true;
     int32_t resultCode = 0;

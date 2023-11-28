@@ -25,15 +25,25 @@ export class VideoCompressor {
     this.object = new newVideoCompressor();
   }
 
-  startRecorder(context:Context,width:number,height:number){
-    let date = new Date();
-    this.outPutFilePath = context.filesDir + "/" + date.getTime() + ".mp4"; //创建输出文件
-    let outputFile = fs.openSync(this.outPutFilePath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
-    if (!outputFile) {
-      console.info("videoCompressor outputFile create error");
-      return -1;
+  startRecorder(context: Context, width: number, height: number): Promise<CompressorResponse> {
+    try {
+      let date = new Date();
+      this.outPutFilePath = context.filesDir + "/" + date.getTime() + ".mp4"; //创建输出文件
+      let outputFile = fs.openSync(this.outPutFilePath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
+      if (!outputFile) {
+        console.info("videoCompressor outputFile create error");
+        return new Promise((resolve, reject) => {
+          fs.unlink(this.outPutFilePath);
+          reject(new Error("videoCompressor outputFile create error"));
+        });
+      }
+      return this.object.startRecordNative(outputFile.fd, width, height, this.outPutFilePath)
+    } catch (err) {
+      return new Promise((resolve, reject) => {
+        fs.unlink(this.outPutFilePath);
+        reject(err);
+      });
     }
-    return this.object.startRecordNative(outputFile.fd,width,height,this.outPutFilePath)
   }
 
   /**
@@ -41,11 +51,11 @@ export class VideoCompressor {
    * @param context
    * @param byteBuffer 图像数据
    */
-  pushOneFrameData(byteBuffer: ArrayBuffer){
+  pushOneFrameData(byteBuffer: ArrayBuffer) {
     return this.object.pushOneFrameDataNative(byteBuffer)
   }
 
-  stopRecorder(){
+  stopRecorder() {
     return this.object.stopRecordNative();
   }
 

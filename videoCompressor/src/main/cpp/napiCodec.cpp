@@ -51,11 +51,11 @@ napi_value VideoCompressor::JsConstructor(napi_env env, napi_callback_info info)
 
 napi_value VideoCompressor::startRecord(napi_env env,napi_callback_info info) {
     napi_value args[4] = {nullptr};
+    size_t argc = 4;
     int32_t outFD = true;
     int32_t width = 0;
     int32_t height = 0;
     size_t charLen = 0;
-    size_t argc = 4;
     int len = 1024;
     char output[1024] = {0};
     // 从js中获取传递的参数
@@ -71,17 +71,48 @@ napi_value VideoCompressor::startRecord(napi_env env,napi_callback_info info) {
     videoRecorder.videoRecordBean_->env = env;
     videoRecorder.videoRecordBean_->width = width;
     videoRecorder.videoRecordBean_->height = height;
+    videoRecorder.videoRecordBean_->bitrate = 959000;
+    videoRecorder.videoRecordBean_->frameRate = 24;
+    videoRecorder.videoRecordBean_->videoMime = OH_AVCODEC_MIMETYPE_VIDEO_AVC;
     videoRecorder.videoRecordBean_->outFd = outFD;
     videoRecorder.videoRecordBean_->outputPath = output;
-    int ret = videoRecorder.startRecord();
-    return 0;
+    // 创建promise
+    napi_value promise;
+    napi_deferred deferred;
+    napi_create_promise(env, &deferred , &promise);
+    // 创建回调信息对象
+    auto callbackInfo = std::make_unique<AsyncCallbackInfo>();
+    callbackInfo->env = env;
+    callbackInfo->asyncWork = nullptr;
+    callbackInfo->deferred = deferred;
+    callbackInfo->outFd = outFD;
+    callbackInfo->outputPath = output;
+    napi_async_execute_callback execute_callback = [](napi_env env, void *data) {
+        std::unique_ptr<AsyncCallbackInfo> data_ptr((AsyncCallbackInfo *)data);
+        VideoRecordManager &videoRecorder = VideoRecordManager::getInstance();
+        videoRecorder.startRecord();
+    };
+    napi_async_complete_callback complete_callback = [](napi_env env, napi_status status, void *data) {
+        std::unique_ptr<AsyncCallbackInfo> data_ptr((AsyncCallbackInfo*)data);
+        VideoRecordManager &videoRecorder = VideoRecordManager::getInstance();
+        videoRecorder.DealCallback(data_ptr.get());
+    };
+    napi_value resourceName;
+    napi_create_string_latin1(env, "videoRecordTest", NAPI_AUTO_LENGTH, &resourceName);
+    napi_create_async_work(env, nullptr, resourceName, execute_callback, complete_callback, (void *)callbackInfo.get(),
+                           &callbackInfo->asyncWork);
+    napi_queue_async_work(env, callbackInfo->asyncWork);
+    return promise;
 }
 
-napi_value VideoCompressor::pushOneFrameDataNative(napi_env env,napi_callback_info cb) {
+napi_value VideoCompressor::pushOneFrameDataNative(napi_env env,napi_callback_info info) {
+    // 从js中获取传递的参数
     napi_value args[1] = {nullptr};
+    size_t argc = 1;
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     void *arrayBufferPtr = nullptr;
-    size_t arrayBufferSize;
-    napi_get_arraybuffer_info(env, args[0], &arrayBufferPtr, &arrayBufferSize); //获取到输入的帧数据
+    size_t arrayBufferSize = 0;
+    napi_get_arraybuffer_info(env, args[0], &arrayBufferPtr, &arrayBufferSize); // 获取到输入的帧数据
     auto &videoRecorder = VideoRecordManager::getInstance();
     videoRecorder.pushOneFrameData(arrayBufferPtr);
     return 0;

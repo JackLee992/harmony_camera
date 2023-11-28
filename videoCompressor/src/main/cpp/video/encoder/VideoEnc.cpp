@@ -19,6 +19,7 @@
 #include <stack>
 #include "hilog/log.h"
 #include "tools.h"
+#include <chrono>
 using namespace std;
 
 #undef LOG_DOMAIN
@@ -54,20 +55,28 @@ namespace {
     static void VencNeedInputData(OH_AVCodec *codec, uint32_t index, OH_AVMemory *data, void *userData){
         VEncSignal *signal = static_cast<VEncSignal *>(userData);
         unique_lock<mutex> lock(signal->inputMutex_);
+        if (signal->inputBufferQueue_.empty()) {
+            OH_LOG_ERROR(LOG_APP, "VencNeedInputData inputBufferQueue_ is null");
+            return;
+        }
+        OH_LOG_ERROR(LOG_APP, "VencNeedInputData inputBufferQueue_ has data");
         auto arrayBuffer = signal->inputBufferQueue_.front();
         // 输入帧buffer对应的index，送入InIndexQueue队列
         // 输入帧的数据mem送入InBufferQueue队列
         memcpy(arrayBuffer, data, signal->arrayBufferSize);
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
         // 配置buffer info信息
         OH_AVCodecBufferAttr attr;
         attr.size = signal->arrayBufferSize;
         attr.offset = 0;
-        attr.pts = 0; // TODO 
+        attr.pts = timestamp;
         attr.flags = AVCODEC_BUFFER_FLAGS_CODEC_DATA;
         // 送入编码输入队列进行编码，index为对应输入队列的下标
         int32_t ret = OH_VideoEncoder_PushInputData(codec, index, attr);
+        OH_LOG_ERROR(LOG_APP, "VencNeedInputData OH_VideoEncoder_PushInputData");
         if (ret != AV_ERR_OK) {
-            // TODO 异常处理
+            OH_LOG_ERROR(LOG_APP, "Failed to OH_VideoEncoder_PushInputData");
         }
     };
 } // namespace
@@ -88,13 +97,7 @@ int32_t VideoEnc::ConfigureVideoEncoder() {
     OH_AVCapability *cap = OH_AVCodec_GetCapability(videoMime.data(), true);
     std::string codecName = OH_AVCapability_GetName(cap);
     OH_LOG_ERROR(LOG_APP, "ConfigureVideoEncoder g_codecName:%{public}s", codecName.data());
-    if (codecName.find("rk") == string::npos) {
-        OH_LOG_ERROR(LOG_APP, "ConfigureVideoEncoder g_codecName npos");
-        OH_AVFormat_SetIntValue(format, OH_MD_KEY_PIXEL_FORMAT, AV_PIXEL_FORMAT_SURFACE_FORMAT);
-    } else {
-        OH_LOG_ERROR(LOG_APP, "ConfigureVideoEncoder g_codecName no npos");
-        OH_AVFormat_SetIntValue(format, OH_MD_KEY_PIXEL_FORMAT, AV_PIXEL_FORMAT_RGBA);
-    }
+    OH_AVFormat_SetIntValue(format, OH_MD_KEY_PIXEL_FORMAT, AV_PIXEL_FORMAT_NV21);
     if (frameRate <= 0) {
         frameRate = defaultFrame;
     }
@@ -200,7 +203,7 @@ void VideoEnc::OutputFunc() {
             break;
         }
         unique_lock<mutex> lock(signal_->outMutex_);
-        signal_->outCond_.wait(lock, [this]() { return (signal_->outIdxQueue_.size() > 0 || !outputIsRunning_.load()); });
+        signal_->outCond_.wait(lock, [this]() { return (signal_->outIdxQueue_.size() > 0 || !outputIsRunning_.load()); }); // FIXME
         if (!outputIsRunning_.load()) {
             break;
         }
