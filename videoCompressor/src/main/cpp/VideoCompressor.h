@@ -17,9 +17,11 @@
 #include "napi/native_api.h"
 class VideoCompressor {
 public:
+    static 
     static napi_value JsConstructor(napi_env env, napi_callback_info info);
     static napi_value startRecord(napi_env env,napi_callback_info info);
     static napi_value pushOneFrameDataNative(napi_env env,napi_callback_info info);
     static napi_value stopRecordNative(napi_env env,napi_callback_info info);
+    static void DealCallback(napi_env env,void *data);
 };
 #endif // COMPRESSOR_H

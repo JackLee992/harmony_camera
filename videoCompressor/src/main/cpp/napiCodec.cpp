@@ -81,28 +81,54 @@ napi_value VideoCompressor::startRecord(napi_env env,napi_callback_info info) {
     napi_deferred deferred;
     napi_create_promise(env, &deferred , &promise);
     // 创建回调信息对象
-    auto callbackInfo = std::make_unique<AsyncCallbackInfo>();
-    callbackInfo->env = env;
-    callbackInfo->asyncWork = nullptr;
-    callbackInfo->deferred = deferred;
-    callbackInfo->outFd = outFD;
-    callbackInfo->outputPath = output;
+    videoRecorder.videoRecordBean_->callbackInfo.env = env;
+    videoRecorder.videoRecordBean_->callbackInfo.asyncWork = nullptr;
+    videoRecorder.videoRecordBean_->callbackInfo.deferred = deferred;
+    videoRecorder.videoRecordBean_->callbackInfo.outFd = outFD;
+    videoRecorder.videoRecordBean_->callbackInfo.outputPath = output;
+    videoRecorder.videoRecordBean_->callbackInfo.width = width;
+    videoRecorder.videoRecordBean_->callbackInfo.height = height;
     napi_async_execute_callback execute_callback = [](napi_env env, void *data) {
-        std::unique_ptr<AsyncCallbackInfo> data_ptr((AsyncCallbackInfo *)data);
         VideoRecordManager &videoRecorder = VideoRecordManager::getInstance();
         videoRecorder.startRecord();
     };
     napi_async_complete_callback complete_callback = [](napi_env env, napi_status status, void *data) {
-        std::unique_ptr<AsyncCallbackInfo> data_ptr((AsyncCallbackInfo*)data);
-        VideoRecordManager &videoRecorder = VideoRecordManager::getInstance();
-        videoRecorder.DealCallback(data_ptr.get());
+        DealCallback(env,&data); // TODO 此处Callback处理有问题
     };
     napi_value resourceName;
     napi_create_string_latin1(env, "videoRecordTest", NAPI_AUTO_LENGTH, &resourceName);
-    napi_create_async_work(env, nullptr, resourceName, execute_callback, complete_callback, (void *)callbackInfo.get(),
-                           &callbackInfo->asyncWork);
-    napi_queue_async_work(env, callbackInfo->asyncWork);
+    napi_create_async_work(env, nullptr, resourceName, execute_callback, complete_callback, 
+                        (void *)&videoRecorder.videoRecordBean_->callbackInfo,
+                           &videoRecorder.videoRecordBean_->callbackInfo.asyncWork);
+    napi_queue_async_work(env, videoRecorder.videoRecordBean_->callbackInfo.asyncWork);
     return promise;
+}
+
+void VideoCompressor::DealCallback(napi_env env,void *data){
+        AsyncCallbackInfo *asyncCallbackInfo = (AsyncCallbackInfo *)data;
+        auto &manager = VideoRecordManager::getInstance();
+        auto resultCode = manager.videoRecordBean_->resultCode;
+        if (resultCode != 0) {
+            if (remove(asyncCallbackInfo->outputPath.data()) == 0) {
+                OH_LOG_ERROR(LOG_APP, "delete outputFile");
+            }
+        }
+        napi_value code;
+        napi_create_int32(env, resultCode, &code);
+        napi_value value;
+        napi_create_string_utf8(env, asyncCallbackInfo->resultStr.data(), NAPI_AUTO_LENGTH, &value);
+        napi_value outputPath;
+        OH_LOG_ERROR(LOG_APP, "callback outputPath:%{public}s", asyncCallbackInfo->outputPath.c_str());
+        napi_create_string_utf8(env, asyncCallbackInfo->outputPath.data(), NAPI_AUTO_LENGTH, &outputPath);
+        napi_value obj;
+        napi_create_object(env, &obj);
+        napi_set_named_property(env, obj, "code", code);
+        napi_set_named_property(env, obj, "message", value);
+        napi_set_named_property(env, obj, "outputPath", outputPath);
+        napi_resolve_deferred(env, asyncCallbackInfo->deferred, obj);
+        napi_delete_async_work(env, asyncCallbackInfo->asyncWork);
+        delete asyncCallbackInfo;
+        manager.videoRecordBean_.reset();
 }
 
 napi_value VideoCompressor::pushOneFrameDataNative(napi_env env,napi_callback_info info) {
@@ -119,7 +145,8 @@ napi_value VideoCompressor::pushOneFrameDataNative(napi_env env,napi_callback_in
 }
 
 napi_value VideoCompressor::stopRecordNative(napi_env env,napi_callback_info cb) {
-    VideoRecordManager::getInstance();
+    VideoRecordManager &recorder = VideoRecordManager::getInstance();
+    recorder.stopRecord();
     return 0;
 }
 
@@ -127,7 +154,7 @@ EXTERN_C_START static napi_value Init(napi_env env, napi_value exports) {
     napi_property_descriptor classProp[] = {
         {"startRecordNative", nullptr, VideoCompressor::startRecord, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"pushOneFrameDataNative", nullptr, VideoCompressor::pushOneFrameDataNative, nullptr, nullptr, nullptr,napi_default, nullptr},
-        {"pushOneFrameDataNative", nullptr, VideoCompressor::stopRecordNative, nullptr, nullptr, nullptr, napi_default,nullptr},
+        {"stopRecordNative", nullptr, VideoCompressor::stopRecordNative, nullptr, nullptr, nullptr, napi_default,nullptr},
     };
     napi_value videoCompressor = nullptr;
     const char *classBindName = "videoCompressor";

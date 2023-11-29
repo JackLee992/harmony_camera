@@ -39,7 +39,7 @@ public:
     std::queue<OH_AVMemory *> outBufferQueue_;
     std::queue<void*> inputBufferQueue_;
     uint32_t arrayBufferSize;
-    size_t getInputBufferQueueSize() const;
+    std::atomic<bool> stopInput{false};
 };
 
 class VideoEnc {
@@ -51,7 +51,7 @@ public:
     uint32_t bitrate = 959000;
     double frameRate = 24;
     std::string videoMime = "";
-//    int32_t CreateVideoEncoder(std::string codeName);
+    //    int32_t CreateVideoEncoder(std::string codeName);
     int32_t CreateVideoEncoder();
     int32_t ConfigureVideoEncoder();
     int32_t SetVideoEncoderCallback();
@@ -61,6 +61,7 @@ public:
     uint32_t GetQualityBitrate(int quality);
     void WaitForEos();
     void StopOutLoop();
+    void StopInput();
     int32_t Release();
     void InputFunc();
     void OutputFunc();
@@ -71,9 +72,7 @@ public:
 private:
     Muxer *muxer;
     std::atomic<bool> outputIsRunning_ { false };
-    std::atomic<bool> inputIsRunning_ { false };
     std::unique_ptr<std::thread> outputLoop_;
-    std::unique_ptr<std::thread> inputLoop_;
     OH_AVCodec *venc_;
     OH_AVCodecAsyncCallback cb_;
     MutexManager *mutexManager;

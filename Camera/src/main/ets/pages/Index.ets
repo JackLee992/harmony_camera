@@ -6,7 +6,7 @@ import bundleManager from '@ohos.bundle.bundleManager';
 import { GlobalContext } from '../utils/GlobalContext';
 import Logger from '../utils/Logger';
 import display from '@ohos.display';
-import { CompressorResponseCode, CompressQuality, VideoCompressor } from '@ohos/videoCompressor';
+import { CompressorResponseCode, VideoCompressor } from '@ohos/videoCompressor';
 import hilog from '@ohos.hilog';
 import data from '@ohos.telephony.data';
 let TAG: string = "Index";
@@ -17,6 +17,8 @@ let previewOutput2: camera.PreviewOutput;
 let cameraInput: camera.CameraInput;
 let cameraSession: camera.CaptureSession;
 let videoCompressor = new VideoCompressor();
+let recordedFrameCount = 0;
+let isStoped = false;
 
 @Entry
 @Component
@@ -41,17 +43,18 @@ struct Index {
     videoCompressor.startRecorder(getContext(), cameraWidth, cameraHeight)
       .then((data) => {
         if (data.code == CompressorResponseCode.SUCCESS) {
-          console.log("videoCompressor message:" + data.message + "--outputPath:" + data.outputPath);
+          Logger.debug("videoCompressor-- record success");
         } else {
-          console.log("videoCompressor code:" + data.code + "--error message:" + data.message);
+          Logger.debug("videoCompressor code:" + data.code + "--error message:" + data.message);
         }
       }).catch((err: Error) => {
-      console.log("videoCompressor HIGH get error message" + err.message);
+      Logger.debug("videoCompressor error message" + err.message);
     });
   }
 
   onPageHide() {
-    videoCompressor.stopRecorder()
+    videoCompressor.stopRecorder(); // 测试停止录制
+    Logger.debug("onPageHide-- stopRecorder");
     releaseCamera()
   }
 
@@ -71,11 +74,16 @@ struct Index {
   }
 }
 
-
 function createImageReceiver(): image.ImageReceiver {
   let receiver: image.ImageReceiver = image.createImageReceiver(cameraWidth, cameraHeight, 4, 8);
   receiver.on('imageArrival', () => {
     receiver.readNextImage((err: BusinessError, nextImage: image.Image) => {
+      // if (recordedFrameCount == 100 && !isStoped) {
+      //     Logger.debug("receiveImage-- record >>stopRecord with " + recordedFrameCount +  "frame image");
+      //
+      //     isStoped = true;
+      //     return;
+      // }
       Logger.debug("receiveImage-- readNextImage:" + nextImage);
       if (err || nextImage === undefined) {
         Logger.error("receiveImage -error:" + err + " nextImage:" + nextImage);
@@ -86,12 +94,12 @@ function createImageReceiver(): image.ImageReceiver {
           Logger.error("receiveImage--getComponent -error:" + err + " imgComponent:" + imgComponent);
           return;
         }
-
         if (imgComponent.byteBuffer as ArrayBuffer) {
           let buffer = imgComponent.byteBuffer;
           Logger.debug("receiveImage--byteBuffer -success:" + " buffer:" + buffer);
-          // TODO  process ths image
+          recordedFrameCount++;
           videoCompressor.pushOneFrameData(buffer)
+          Logger.debug("receiveImage-- record >>pushOneFrameData with no." + recordedFrameCount +  " frame");
           nextImage.release() //需要将对应的image释放，确保Surface的BufferQueue正常轮转
         } else {
           Logger.debug("receiveImage--byteBuffer -error:" + " imgComponent.byteBuffer:" + imgComponent.byteBuffer);

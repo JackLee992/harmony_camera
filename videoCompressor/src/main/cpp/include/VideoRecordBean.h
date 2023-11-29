@@ -30,7 +30,7 @@ struct VideoRecordBean {
     std::unique_ptr<Muxer> *muxer;
     std::unique_ptr<VideoEnc> *vEncSample;
     std::unique_ptr<MutexManager> *mutexManager;
-//    std::unique_ptr<AsyncCallbackInfo> *callbackInfo;
+    AsyncCallbackInfo callbackInfo{};
     std::string outputPath = "";
     int32_t outFd = true;
     int32_t resultCode = 0;

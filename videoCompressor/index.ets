@@ -12,5 +12,5 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-export { VideoCompressor, CompressQuality } from './src/main/ets/components/mainpage/VideoCompressor'
+export { VideoCompressor } from './src/main/ets/components/mainpage/VideoCompressor'
 export { CompressorResponse, CompressorResponseCode } from './src/main/ets/components/mainpage/CompressorResponse'

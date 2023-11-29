@@ -47,30 +47,31 @@ void VideoRecordManager::SetCallBackResult(int32_t code, std::string str) {
     videoRecordBean_->resultStr = str;
 }
 
-void VideoRecordManager::DealCallback(void *data){
-    AsyncCallbackInfo *asyncCallbackInfo = (AsyncCallbackInfo *)data;
-    if (videoRecordBean_->resultCode != 0) {
-        if (remove(asyncCallbackInfo->outputPath.data()) == 0) {
-            OH_LOG_ERROR(LOG_APP, "delete outputFile");
-        }
-    }
-    napi_env env = asyncCallbackInfo->env;
-    napi_value code;
-    napi_create_int32(env, videoRecordBean_->resultCode, &code);
-    napi_value value;
-    napi_create_string_utf8(env, asyncCallbackInfo->resultStr.data(), NAPI_AUTO_LENGTH, &value);
-    napi_value outputPath;
-    OH_LOG_ERROR(LOG_APP, "callback outputPath:%{public}s", asyncCallbackInfo->outputPath.c_str());
-    napi_create_string_utf8(env, asyncCallbackInfo->outputPath.data(), NAPI_AUTO_LENGTH, &outputPath);
-    napi_value obj;
-    napi_create_object(env, &obj);
-    napi_set_named_property(env, obj, "code", code);
-    napi_set_named_property(env, obj, "message", value);
-    napi_set_named_property(env, obj, "outputPath", outputPath);
-    napi_resolve_deferred(env, asyncCallbackInfo->deferred, obj);
-    napi_delete_async_work(env, asyncCallbackInfo->asyncWork);
-    delete asyncCallbackInfo;
-}
+//void VideoRecordManager::DealCallback(void *data){
+//    AsyncCallbackInfo *asyncCallbackInfo = (AsyncCallbackInfo *)data;
+//    if (videoRecordBean_->resultCode != 0) {
+//        if (remove(asyncCallbackInfo->outputPath.data()) == 0) {
+//            OH_LOG_ERROR(LOG_APP, "delete outputFile");
+//        }
+//    }
+//    napi_env env = videoRecordBean_->env;
+//    napi_value code;
+//    napi_create_int32(env, videoRecordBean_->resultCode, &code);
+//    napi_value value;
+//    napi_create_string_utf8(env, asyncCallbackInfo->resultStr.data(), NAPI_AUTO_LENGTH, &value);
+//    napi_value outputPath;
+//    OH_LOG_ERROR(LOG_APP, "callback outputPath:%{public}s", asyncCallbackInfo->outputPath.c_str());
+//    napi_create_string_utf8(env, asyncCallbackInfo->outputPath.data(), NAPI_AUTO_LENGTH, &outputPath);
+//    napi_value obj;
+//    napi_create_object(env, &obj);
+//    napi_set_named_property(env, obj, "code", code);
+//    napi_set_named_property(env, obj, "message", value);
+//    napi_set_named_property(env, obj, "outputPath", outputPath);
+//    napi_resolve_deferred(env, asyncCallbackInfo->deferred, obj);
+//    napi_delete_async_work(env, asyncCallbackInfo->asyncWork);
+//    delete asyncCallbackInfo;
+//    videoRecordBean_.reset();
+//}
 
 void VideoRecordManager::pushOneFrameData(void *data){
     // 判断是否已经可以推数据了（编码器是否准备好了）
@@ -135,13 +136,17 @@ void VideoRecordManager::VideoCompressorWaitEos() {
     OH_LOG_ERROR(LOG_APP, "VideoCompressorDestroy end");
 }
 
+void VideoRecordManager::stopRecord(){
+    videoRecorderIsReady = false;
+    videoRecordBean_->vEncSample->get()->StopInput();
+}
+
 void VideoRecordManager::Release() {
     if (videoRecordBean_) {
-        VideoCompressorWaitEos();
+        videoRecorderIsReady = false;
         videoRecordBean_->vEncSample->get()->Release();
         videoRecordBean_->muxer->get()->StopMuxer();
         videoRecordBean_->vEncSample = nullptr;
         videoRecordBean_->muxer = nullptr;
-        videoRecordBean_.reset();
     }
 }

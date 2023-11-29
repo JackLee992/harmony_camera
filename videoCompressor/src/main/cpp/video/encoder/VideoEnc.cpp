@@ -29,8 +29,6 @@ using namespace std;
 
 VideoEnc::~VideoEnc() { Release(); }
 
-size_t VEncSignal::getInputBufferQueueSize() const { return inputBufferQueue_.size(); }
-
 namespace {
     static void VencError(OH_AVCodec *codec, int32_t errorCode, void *userData) {
         OH_LOG_ERROR(LOG_APP, "VideoEnc - VencError:%d",errorCode );
@@ -50,6 +48,9 @@ namespace {
         if (!attr) {
             OH_LOG_ERROR(LOG_APP, "VencOutputDataReady attr is null");
         } else {
+            if (attr->flags ==AVCODEC_BUFFER_FLAGS_EOS) {
+                OH_LOG_ERROR(LOG_APP, "VencOutputDataReady attr is EOS");
+            }
             signal->outputAttrQueue.push(*attr);
         }
         signal->outCond_.notify_all();
@@ -58,23 +59,40 @@ namespace {
     static void VencNeedInputData(OH_AVCodec *codec, uint32_t index, OH_AVMemory *data, void *userData) {
         VEncSignal *signal = static_cast<VEncSignal *>(userData);
         unique_lock<mutex> lock(signal->inputMutex_);
-        signal->inputCond_.wait(lock, [&signal] { return !signal->inputBufferQueue_.empty(); });
+        signal->inputCond_.wait(lock, [&signal] { return !signal->inputBufferQueue_.empty()|| signal->stopInput;});
         OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData inputBufferQueue_ has data :%{public}zu",
-                     signal->getInputBufferQueueSize());
-        auto &arrayBuffer = signal->inputBufferQueue_.front();
-        // 输入帧buffer对应的index，送入InIndexQueue队列
-        // 输入帧的数据mem送入InBufferQueue队列
-        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData --before memcpy");
-        std::memcpy(data, arrayBuffer, signal->arrayBufferSize);
-        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData --after memcpy");
+                     signal->arrayBufferSize);
         auto now = std::chrono::system_clock::now();
         auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
         // 配置buffer info信息
         OH_AVCodecBufferAttr attr;
-        attr.size = signal->arrayBufferSize;
+        attr.size = 0;
         attr.offset = 0;
         attr.pts = timestamp;
+        if (signal->stopInput) {
+            attr.flags = AVCODEC_BUFFER_FLAGS_EOS;
+            int32_t ret = OH_VideoEncoder_PushInputData(codec, index, attr);
+            if (ret != AV_ERR_OK) {
+                OH_LOG_ERROR(LOG_APP, "Failed to OH_VideoEncoder_PushInputData");
+            }
+            OH_LOG_ERROR(LOG_APP, "StopInput --VencNeedInputData >>PushInputData-EOS");
+            return;
+        }
+        if (signal->inputBufferQueue_.empty()) {
+            return;
+        }
+        attr.size = signal->arrayBufferSize;
         attr.flags = AVCODEC_BUFFER_FLAGS_CODEC_DATA;
+        auto &arrayBuffer = signal->inputBufferQueue_.front();
+        // 输入帧buffer对应的index，送入InIndexQueue队列
+        // 输入帧的数据mem送入InBufferQueue队列
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData --before memcpy");
+        uint8_t *dataAddr = OH_AVMemory_GetAddr(data);
+        int32_t dataSize = OH_AVMemory_GetSize(data);
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData data size :%{public}zu", dataSize);
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -arrayBuffer data size :%{public}zu", signal->arrayBufferSize);
+        std::memcpy(dataAddr, arrayBuffer, signal->arrayBufferSize);
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData --after memcpy");
         // 送入编码输入队列进行编码，index为对应输入队列的下标
         int32_t ret = OH_VideoEncoder_PushInputData(codec, index, attr);
         OH_LOG_ERROR(LOG_APP, "VencNeedInputData OH_VideoEncoder_PushInputData");
@@ -129,6 +147,7 @@ int32_t VideoEnc::SetVideoEncoderCallback() {
         return AV_ERR_UNKNOWN;
     }
     signal_->arrayBufferSize = width * height *  3/2;
+    signal_->stopInput.store(false);
     cb_.onError = VencError;
     cb_.onStreamChanged = VencFormatChanged;
     cb_.onNeedOutputData = VencOutputDataReady;
@@ -198,6 +217,7 @@ void VideoEnc::SendEncEos() {
 
 void VideoEnc::pushFrameData(void* arrayBufferPtr){
     unique_lock<mutex> lock(signal_->inputMutex_);
+    if(signal_->stopInput)return;
     size_t dataSize = signal_->arrayBufferSize; //nv21的图像数据
     void* copyBuffer = std::malloc(dataSize);
     if(copyBuffer ==nullptr){
@@ -209,7 +229,7 @@ void VideoEnc::pushFrameData(void* arrayBufferPtr){
     std::memcpy(copyBuffer, arrayBufferPtr, dataSize);
     // 将 copyBuffer 添加到队列中
     signal_.get()->inputBufferQueue_.push(copyBuffer);
-    OH_LOG_ERROR(LOG_APP, "VideoEnc -pushFrameData:%{public}zu",signal_.get()->getInputBufferQueueSize());
+    OH_LOG_ERROR(LOG_APP, "VideoEnc -pushFrameData:%{public}zu",signal_.get()->arrayBufferSize);
     signal_->inputCond_.notify_one();
 }
 
@@ -221,7 +241,7 @@ void VideoEnc::OutputFunc() {
             break;
         }
         unique_lock<mutex> lock(signal_->outMutex_);
-        signal_->outCond_.wait(lock, [this]() { return (signal_->outIdxQueue_.size() > 0 || !outputIsRunning_.load()); }); // FIXME
+        signal_->outCond_.wait(lock, [this]() { return (signal_->outIdxQueue_.size() > 0 || !outputIsRunning_.load()); });
         if (!outputIsRunning_.load()) {
             break;
         }
@@ -230,7 +250,7 @@ void VideoEnc::OutputFunc() {
         if (attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
             outputIsRunning_.store(false);
             signal_->outCond_.notify_all();
-            OH_LOG_ERROR(LOG_APP, "ENCODE EOS %{public}lld", enCount);
+            OH_LOG_ERROR(LOG_APP, "StopInput --OutputFunc ENCODE EOS %{public}lld", enCount);
             break;
         }
         OH_AVMemory *buffer = signal_->outBufferQueue_.front();
@@ -273,6 +293,13 @@ int32_t VideoEnc::Release() {
     }
     return AV_ERR_OK;
 }
+
+void VideoEnc::StopInput(){
+    unique_lock<mutex> lock(signal_->inputMutex_);
+    signal_->stopInput.store(true);
+    OH_LOG_ERROR(LOG_APP, "StopInput --call");
+    signal_->inputCond_.notify_all();
+}   
 
 void VideoEnc::StopOutLoop() {
     if (outputLoop_ != nullptr && outputLoop_->joinable()) {
