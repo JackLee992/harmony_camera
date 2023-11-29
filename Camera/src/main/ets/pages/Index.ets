@@ -9,7 +9,6 @@ import display from '@ohos.display';
 import { CompressorResponseCode, CompressQuality, VideoCompressor } from '@ohos/videoCompressor';
 import hilog from '@ohos.hilog';
 import data from '@ohos.telephony.data';
-
 let TAG: string = "Index";
 let cameraWidth = 1920;
 let cameraHeight = 1080;
@@ -92,10 +91,7 @@ function createImageReceiver(): image.ImageReceiver {
           let buffer = imgComponent.byteBuffer;
           Logger.debug("receiveImage--byteBuffer -success:" + " buffer:" + buffer);
           // TODO  process ths image
-          videoCompressor.pushOneFrameData(buffer) // TODO
-          // let imageResource = image.createImageSource(buffer);
-          // let pixMap:PixelMap = imageResource.createPixelMap();
-          // pixMap.release()
+          videoCompressor.pushOneFrameData(buffer)
           nextImage.release() //需要将对应的image释放，确保Surface的BufferQueue正常轮转
         } else {
           Logger.debug("receiveImage--byteBuffer -error:" + " imgComponent.byteBuffer:" + imgComponent.byteBuffer);

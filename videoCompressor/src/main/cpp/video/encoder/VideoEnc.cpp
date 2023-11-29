@@ -29,17 +29,20 @@ using namespace std;
 
 VideoEnc::~VideoEnc() { Release(); }
 
+size_t VEncSignal::getInputBufferQueueSize() const { return inputBufferQueue_.size(); }
+
 namespace {
     static void VencError(OH_AVCodec *codec, int32_t errorCode, void *userData) {
-    
+        OH_LOG_ERROR(LOG_APP, "VideoEnc - VencError:%d",errorCode );
     }
 
     static void VencFormatChanged(OH_AVCodec *codec, OH_AVFormat *format, void *userData) {
-    
+        OH_LOG_ERROR(LOG_APP, "VideoEnc - VencFormatChanged");
     }
 
     static void VencOutputDataReady(OH_AVCodec *codec, uint32_t index, OH_AVMemory *data, OH_AVCodecBufferAttr *attr,
                                     void *userData) {
+        OH_LOG_ERROR(LOG_APP, "VideoEnc - VencOutputDataReady");
         VEncSignal *signal = static_cast<VEncSignal *>(userData);
         unique_lock<mutex> lock(signal->outMutex_);
         signal->outIdxQueue_.push(index);
@@ -52,18 +55,18 @@ namespace {
         signal->outCond_.notify_all();
     }
 
-    static void VencNeedInputData(OH_AVCodec *codec, uint32_t index, OH_AVMemory *data, void *userData){
+    static void VencNeedInputData(OH_AVCodec *codec, uint32_t index, OH_AVMemory *data, void *userData) {
         VEncSignal *signal = static_cast<VEncSignal *>(userData);
         unique_lock<mutex> lock(signal->inputMutex_);
-        if (signal->inputBufferQueue_.empty()) {
-            OH_LOG_ERROR(LOG_APP, "VencNeedInputData inputBufferQueue_ is null");
-            return;
-        }
-        OH_LOG_ERROR(LOG_APP, "VencNeedInputData inputBufferQueue_ has data");
-        auto arrayBuffer = signal->inputBufferQueue_.front();
+        signal->inputCond_.wait(lock, [&signal] { return !signal->inputBufferQueue_.empty(); });
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData inputBufferQueue_ has data :%{public}zu",
+                     signal->getInputBufferQueueSize());
+        auto &arrayBuffer = signal->inputBufferQueue_.front();
         // 输入帧buffer对应的index，送入InIndexQueue队列
         // 输入帧的数据mem送入InBufferQueue队列
-        memcpy(arrayBuffer, data, signal->arrayBufferSize);
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData --before memcpy");
+        std::memcpy(data, arrayBuffer, signal->arrayBufferSize);
+        OH_LOG_ERROR(LOG_APP, "VideoEnc -VencNeedInputData --after memcpy");
         auto now = std::chrono::system_clock::now();
         auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
         // 配置buffer info信息
@@ -78,6 +81,8 @@ namespace {
         if (ret != AV_ERR_OK) {
             OH_LOG_ERROR(LOG_APP, "Failed to OH_VideoEncoder_PushInputData");
         }
+        signal->inputBufferQueue_.pop();
+        std::free(arrayBuffer); // 释放内存
     };
 } // namespace
 
@@ -123,7 +128,7 @@ int32_t VideoEnc::SetVideoEncoderCallback() {
         OH_LOG_ERROR(LOG_APP, "Failed to new VencSignal");
         return AV_ERR_UNKNOWN;
     }
-    signal_->arrayBufferSize = width * height * 3;
+    signal_->arrayBufferSize = width * height *  3/2;
     cb_.onError = VencError;
     cb_.onStreamChanged = VencFormatChanged;
     cb_.onNeedOutputData = VencOutputDataReady;
@@ -192,7 +197,20 @@ void VideoEnc::SendEncEos() {
 }
 
 void VideoEnc::pushFrameData(void* arrayBufferPtr){
-    signal_.get()->inputBufferQueue_.push(arrayBufferPtr);
+    unique_lock<mutex> lock(signal_->inputMutex_);
+    size_t dataSize = signal_->arrayBufferSize; //nv21的图像数据
+    void* copyBuffer = std::malloc(dataSize);
+    if(copyBuffer ==nullptr){
+        OH_LOG_ERROR(LOG_APP, "pushFrameData: failed with malloc error");
+        return;
+    }
+    OH_LOG_ERROR(LOG_APP, "VideoEnc -pushFrameData --start");
+    // 拷贝数据
+    std::memcpy(copyBuffer, arrayBufferPtr, dataSize);
+    // 将 copyBuffer 添加到队列中
+    signal_.get()->inputBufferQueue_.push(copyBuffer);
+    OH_LOG_ERROR(LOG_APP, "VideoEnc -pushFrameData:%{public}zu",signal_.get()->getInputBufferQueueSize());
+    signal_->inputCond_.notify_one();
 }
 
 void VideoEnc::OutputFunc() {

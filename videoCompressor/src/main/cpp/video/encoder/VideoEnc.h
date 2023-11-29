@@ -37,8 +37,9 @@ public:
     std::queue<OH_AVCodecBufferAttr> outputAttrQueue;
     std::queue<OH_AVCodecBufferAttr> inputAttrQueue;
     std::queue<OH_AVMemory *> outBufferQueue_;
-    std::queue<void *> inputBufferQueue_;
+    std::queue<void*> inputBufferQueue_;
     uint32_t arrayBufferSize;
+    size_t getInputBufferQueueSize() const;
 };
 
 class VideoEnc {
@@ -61,7 +62,7 @@ public:
     void WaitForEos();
     void StopOutLoop();
     int32_t Release();
-//    void InputFunc();
+    void InputFunc();
     void OutputFunc();
     void SendEncEos();
 //    int32_t GetSurface();
