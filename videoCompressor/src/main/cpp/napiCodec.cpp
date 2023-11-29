@@ -81,26 +81,26 @@ napi_value VideoCompressor::startRecord(napi_env env,napi_callback_info info) {
     napi_deferred deferred;
     napi_create_promise(env, &deferred , &promise);
     // 创建回调信息对象
-    videoRecorder.videoRecordBean_->callbackInfo.env = env;
-    videoRecorder.videoRecordBean_->callbackInfo.asyncWork = nullptr;
-    videoRecorder.videoRecordBean_->callbackInfo.deferred = deferred;
-    videoRecorder.videoRecordBean_->callbackInfo.outFd = outFD;
-    videoRecorder.videoRecordBean_->callbackInfo.outputPath = output;
-    videoRecorder.videoRecordBean_->callbackInfo.width = width;
-    videoRecorder.videoRecordBean_->callbackInfo.height = height;
+    AsyncCallbackInfo *callbackInfo = new AsyncCallbackInfo();
+    callbackInfo->env = env;
+    callbackInfo->asyncWork = nullptr;
+    callbackInfo->deferred = deferred;
+    callbackInfo->outFd = outFD;
+    callbackInfo->outputPath = output;
+    callbackInfo->width = width;
+    callbackInfo->height = height;
     napi_async_execute_callback execute_callback = [](napi_env env, void *data) {
         VideoRecordManager &videoRecorder = VideoRecordManager::getInstance();
         videoRecorder.startRecord();
     };
-    napi_async_complete_callback complete_callback = [](napi_env env, napi_status status, void *data) {
-        DealCallback(env,&data); // TODO 此处Callback处理有问题
-    };
     napi_value resourceName;
     napi_create_string_latin1(env, "videoRecordTest", NAPI_AUTO_LENGTH, &resourceName);
-    napi_create_async_work(env, nullptr, resourceName, execute_callback, complete_callback, 
-                        (void *)&videoRecorder.videoRecordBean_->callbackInfo,
-                           &videoRecorder.videoRecordBean_->callbackInfo.asyncWork);
-    napi_queue_async_work(env, videoRecorder.videoRecordBean_->callbackInfo.asyncWork);
+    napi_create_async_work(
+        env, nullptr, resourceName, execute_callback,
+        [](napi_env env, napi_status status, void *data) { DealCallback(env, data); },
+        (void *)callbackInfo,
+        &callbackInfo->asyncWork);
+    napi_queue_async_work(env, callbackInfo->asyncWork);
     return promise;
 }
 
